@@ -1,0 +1,509 @@
+Hello, useful things for future me to connect flawlessly :)
+First of all, the OpenVPN file which is given us from FINKI !CANNOT! be ran by the Ubuntu Server, you gotta run it in your OWN terminal. Windows→ Putty
+
+STEP 0: First check and disable running processes if it makes you a problem:
+sudo pkill openvpn
+
+STEP 1: scp *LOCATION**FILENAME*.ovpn zhaba@192.168.1.76:/home/zhaba/
+what is scp? scp is a tool for copying files between two machines with SSH its encoded and it connects via network, it transfers files using a SSH tunnel, same as a send file button but for a terminal, if you dont have a GUI or you work just with servers this is very useful. :)
+ssh → remote keyboard  scp → remote USB stick
+
+STEP 2: ssh connection to Ubuntu server → ssh zhaba@192.168.1.76
+*you can check which files you have with ls ~ | grep ovpn 
+
+STEP 3: sudo openvpn --config *FILENAME*.ovpn
+now you let this run in the terminal and you are successfully connected! you can open another terminal and type ip a to see the list of ip addresses:
+
+enp0s3 →192.168.1.76 is a normal LAN connection
+tun0 → 10.155.2.133/25 this is the vpn ip that we use!
+
+tmux
+sudo openvpn --config *FILENAME*.ovpn
+with this code above you can revive the vpn if ssh crashes
+
+
+
+
+1. (15) Најавете се на машината со која е асоциран вашиот број на индекс. Корисничко име за
+најава student, лозинка Laboratorija11!
+Направете нов корисник со име ansXXXXXX, каде XXXXXX е вашиот број на индекс. Направете група
+ans и додадете го тој корисник во групата. Како hostname на вашата виртуелка наместете ansdatum, каде datum е вашиот датум на раѓање во облик ddmmyyyy
+
+→ sudo adduser ans232072 - add new user
+
+→ sudo groupadd ans - add new group
+
+→ sudo usermod -aG ans ans232072    
+-aG се користи за додавање корисник во дополнителна група без да се отстранат постоечките групи.
+
+→ groups ans232072 - proverka
+
+→ sudo hostnamectl set-hostname ans27012005 - postavuvanje hostname
+
+
+
+2.(20) Инсталирајте BIND DNS сервер, и додадете го како прв локален dns сервер на машината.
+Допуштете да може да се пристапи до него (да се користи како DNS) од било која машина во
+мрежата 10.10.0.0/16. Креирајте нова master зона согласно името index.io.mk, каде што index е
+бројот на вашиот индекс. Во зоната додадете ги следните записи:
+- NS сервери се вашиот сервер и серверот ns.ans.mk, кој има IP адреса 10.10.16.200
+- A записи за ns1, www и ftp2 кои ќе покажуваат кон вашиот сервер
+- A запис за dns, кој ќе покажува кон 10.10.16.200
+- CNAME запис за web, кој ќе покажува кон www.index.io.mk
+Овозможете forwarding-от на барањата до вашиот DNS server за зони за кои не може да одговори
+да бидат проследувани до DNS серверите 1.0.0.1 и 1.1.1.1.
+
+FIRST STEP:
+sudo apt update
+sudo apt install bind9
+
+sudo nano /etc/resolv.conf → nameserver 127.0.0.1
+
+SECOND STEP:
+then we go into 
+sudo nano /etc/bind/named.conf.options
+
+allow-query { 10.10.0.0/16; localhost; }; → allows queries only from 10.10.0.0/16
+listen-on → it will be at default if its not then it has to be any;
+forwarders { 1.1.1.1; 1.0.0.1; }; → it allows forwarders from DNS servers
+
+sudo named-checkconf → check syntax errors
+sudo systemctl restart bind9
+
+THIRD STEP:
+sudo nano /etc/bind/named.conf.local → we configurate the local where the zones need to be
+
+zone "232072.io.mk" {
+    type master;
+    file "/etc/bind/zones/db.232072.io.mk";
+}; we make a master zone , meaning primary/authoritative server, and we make a zone file
+
+the next step is going into the zone file and setting it up! 
+
+ZONE FILE ( /etc/bind/zones/db.232072.io.mk ) :
+*the /zones directory is not mandatory, its just for organization
+
+sudo nano /etc/bind/zones/db.232072.io.mk → automatically creates a new file and starts configuring it
+
+The order of the zone file needs to be:
+$TTL → default time for caching ( default 86400 )
+
+$SOA → Start of Authority, this NEEDS to be on the first place, tehnically is the ID card of the zone file, it tells who is the main DNS, who is the admin and the serial number/version. 
+*important: . on the end of the names, if you change something you change the SERIAL number.
+
+NS → authoritative servers, the first one is our server, the second one is ns.ans.mk, NS SHOWS NAME, NOT IP! → ns1.232072.io.mk. ( our server ) and the server ns.ans.mk.     
+! NS asks Which one is the DNS server !
+
+A → address record ns1,www,ftp2 - 10.155.2.113 (our server) | dns - 10.10.16.200
+this NAME is found on this IP ADDRESS!
+! A maps a domain name to the IP address !
+
+CNAME → alias for another name, 
+ex. web.232072.io.mk → www.232072.io.mk
+web doesnt know the IP, it borrows it from www,  
+! CNAME creates Alias !
+
+*we already put forwarders in the second step:
+forwarders { 1.1.1.1; 1.0.0.1; }; → it allows forwarders from DNS servers*
+
+→ dig @localhost www.232072.io.mk
+→ dig @localhost web.232072.io.mk
+→ dig @localhost dns.232072.io.mk
+
+
+DONE WITH BIND DNS! Congrats if you made it this far :)
+
+*If you need to make slave zones:
+zone "name" {
+   type slave;
+   masters{ ip_address; };
+}
+
+
+3. (10) Инсталирајте apache веб сервер.
+→ sudo apt update
+→ sudo apt install apache2
+→ systemctl status apache2
+
+4. (20) Инсталирајте последна стабилна верзија од Moodle во сервер блок со виртуелен хост IP
+адресата на серверот и порта 8088. Инсталирајте и конфигурирајте ги сите апликации, екстензии и
+сервери потребни за да проработи сајтот. Верзијата на php треба да биде тековната
+(стандардната) за вашиот сервер.
+
+Okay so this one is interesting, for now we have a server, working DNS, server IP address and we want an Apache web server, Moodle PHP application, Virtual Host,
+IP + port 8088, standard PHP version.
+
+
+1. sudo apt install php libapache2-mod-php   → this will install some packages, but some may be missing later on, we will fix that if it makes a problem.
+php -v  → if it shows a version, its successfully installed
+
+3. sudo nano /etc/apache2/ports.conf
+you need to put Listen 8088 under Listen 80
+
+4. sudo apt install mysql-server → install mysql 
+sudo mysql,  when you enter you gotta remember this pattern which is standard for all web applications : DATABASE → USER → PERMISSIONS
+
+Basically remember this: For every web application, we create a database,a user and grant privileges. Here is how it looks:
+
+CREATE DATABASE moodle DEFAULT CHARACTER SET utf8mb4;
+CREATE USER 'moodleuser'@'localhost' IDENTIFIED BY 'password';
+GRANT ALL PRIVILEGES ON moodle.* TO 'moodleuser'@'localhost';
+FLUSH PRIVILEGES;
+EXIT;
+
+
+Moodle(Official page instructions)
+Install a stable moodle version:
+sudo apt update
+sudo apt install git
+cd /var/www/html
+sudo git clone git://git.moodle.org/moodle.git
+cd moodle
+
+Choose a stable branch:
+sudo git branch -a
+sudo git branch --track MOODLE_501_STABLE origin/MOODLE_501_STABLE
+sudo git checkout MOODLE_501_STABLE
+
+Create a moodledata directory:
+sudo mkdir /var/moodledata
+
+Permissions:
+sudo chown -R www-data:www-data /var/www/html/moodle
+sudo chown -R www-data:www-data /var/moodledata
+
+sudo chmod -R 755 /var/www/html/moodle
+sudo chmod -R 770 /var/moodledata
+
+Create a virtual host:
+sudo nano /etc/apache2/sites-available/moodle.conf
+
+<VirtualHost *:8088>
+    ServerAdmin admin@232072.io.mk
+    DocumentRoot /opt/moodle
+
+    <Directory /opt/moodle>
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    ErrorLog ${APACHE_LOG_DIR}/moodle_error.log
+    CustomLog ${APACHE_LOG_DIR}/moodle_access.log combined
+</VirtualHost>
+
+Enable site + rewrite module:
+sudo a2ensite moodle.conf  → enable site
+sudo a2enmod rewrite
+sudo systemctl reload apache2
+
+ss -tulnp | grep 8088 → check 
+
+Start Moodle installer:
+http://<SERVER_IP>:8088 → this into the browser to start the installation
+
+Paths:
+Moodle directory: /opt/moodle
+Data directory: /var/moodledata
+
+Database:
+Type: MySQL / MariaDB
+DB name: moodle
+DB user: moodleuser
+Password: password
+Host: localhost
+Port: default
+
+If the installer is failing try:
+sudo nano /etc/php/*/apache2/php.ini
+memory_limit = 256M | max_input_vars = 5000 → put this
+sudo systemctl restart apache2
+
+intl missing:
+sudo apt install php-intl
+sudo systemctl restart apache2
+
+
+5. (15) Инсталирајте NFS клиент. Креирајте директориуми за маунтирање /nfs/jan2024 и /nfs/proba2024. Маунтирајте ги следните nfs фолдери од nfs серверот на 10.10.16.200: - /mnt/kolokvium_2024 на /nfs/jan2024 - /mnt/proba на /nfs/proba2024 Додадете ги точките за маунтирање во /etc/fstab, за да може да се пристапат и после рестартирање на машината. Во /nfs/jan2024 креирајте ваш фолдер со име на индекс и внатре креирајте празна датотека со име по ваш избор.
+
+
+Installation:
+sudo apt update 
+sudo apt install nfs-common
+
+Create directories:
+sudo mkdir -p /nfs/jan2024
+sudo mkdir -p /nfs/proba2024
+ls -ld /nfs/jan2024 /nfs/proba2024 - check if created
+
+Mount the NFS folders:
+sudo mount 10.10.16.200:/mnt/kolokvium_2024 /nfs/jan2024
+sudo mount 10.10.16.200:/mnt/proba /nfs/proba2024
+
+Mount on /etc/fstab:
+sudo nano /etc/fstab
+→ add these two lines below
+10.10.16.200:/mnt/kolokvium_2024 /nfs/jan2024    nfs    defaults    0   0
+10.10.16.200:/mnt/proba              /nfs/proba2024  nfs    defaults    0   0
+
+Test:
+sudo umount /nfs/jan2024
+sudo umount /nfs/proba2024
+sudo mount -a
+
+Create folder with your index in /nfs/jan2024:
+cd /nfs/jan2024
+mkdir 232072 → create folder
+cd 232072
+touch test.txt → create text file
+ls -l
+
+
+6. (20) Инсталирајте и конфигурирајте ufw или firewalld (во зависност од оперативниот систем) да ги пропушта само барањата до поставените сервиси (SSH, DNS, HTTP/HTTPS, FTP и портата за инсталираниот Moodle сајт)
+
+Installation
+sudo apt update
+sudo apt install ufw
+sudo ufw status → it needs to be disabled on default
+
+Default politics
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+
+SSH (TCP 22)
+sudo ufw allow ssh
+
+DNS (TCP + UDP 53)
+sudo ufw allow 53/tcp
+sudo ufw allow 53/udp
+
+HTTP(TCP 80)
+sudo ufw allow http
+
+HTTPS(TCP 443)
+sudo ufw allow https
+
+FTP(TCP 21)
+sudo ufw allow ftp
+
+MOODLE
+sudo ufw allow 8088/tcp
+
+
+3. (10) Инсталирајте apache веб сервер.
+4. (20) Инсталирајте последна стабилна верзија од Wordpress во сервер блок со виртуелен хост
+wp.index.com (index – е вашиот индекс). Инсталирајте и конфигурирајте ги сите апликации,
+екстензии и сервери (mysql или mariadb) потребни за да проработи сајтот. Верзијата на php треба
+да биде нативната за оперативниот систем. 
+
+sudo apt update
+sudo apt install apache2 -y
+sudo systemctl status apache2
+ 
+sudo apt install php libapache2-mod-php php-mysql php-curl php-gd php-mbstring php-xml php-zip -y
+php -v
+
+sudo apt install mysql-server -y
+sudo systemctl status mysql
+
+sudo mysql
+CREATE DATABASE wordpress;
+CREATE USER wordpress@localhost IDENTIFIED BY '123';
+GRANT SELECT,INSERT,UPDATE,DELETE,CREATE,DROP,ALTER
+ON wordpress.* TO wordpress@localhost;
+FLUSH PRIVILEGES;
+EXIT;
+
+sudo mkdir -p /srv/www → Creates a directory that will be used to store website files.
+
+sudo chown www-data: /srv/www → Assigns ownership of the directory to the Apache web server user (www-data).
+
+curl https://wordpress.org/latest.tar.gz | sudo -u www-data tar zx -C /srv/www
+*Downloads the latest stable WordPress version and extracts it into /srv/www
+The extraction is done as www-data to ensure correct file ownership.
+
+sudo nano /etc/apache2/sites-available/wordpress.conf
+
+<VirtualHost *:80>
+    ServerName wp.index.com *defines the domain name of the website
+    ServerAlias www.wp.index.com
+    DocumentRoot /srv/www/wordpress 
+    <Directory /srv/www/wordpress>
+        AllowOverride All *allows WordPress to use .htaccess files
+        Require all granted *allows public access to the site
+    </Directory>
+</VirtualHost>
+
+sudo a2ensite wordpress.conf → Enables the WordPress virtual host.
+sudo a2enmod rewrite → Enables the Apache rewrite module required for WordPress permalinks.
+sudo a2dissite 000-default.conf → Disables the default Apache website to prevent conflicts.
+sudo systemctl reload apache2 
+
+apachectl -S
+
+cd /srv/www/wordpress
+sudo -u www-data cp wp-config-sample.php wp-config.php
+sudo nano wp-config.php
+
+define( 'DB_NAME', 'wordpress' );
+define( 'DB_USER', 'wordpress' );
+define( 'DB_PASSWORD', '123' );
+define( 'DB_HOST', 'localhost' );
+
+http://192.168.100.126 → login
+
+Apache as Reverse Proxy for Node.js:
+
+sudo apt install nodejs npm -y
+node -v npm -v
+
+mkdir /nodeapp → create app directory
+cd /nodeapp
+
+nano app.js
+
+const http = require("http");
+http.createServer((req, res) => {
+  res.writeHead(200, { "Content-Type": "text/plain" });
+  res.end("Node.js app behind Apache reverse proxy\n");
+}).listen(3000);
+
+node app.js
+
+curl http://127.0.0.1:3000
+
+node done :3
+
+now, proxy:
+
+sudo a2enmod proxy
+sudo a2enmod proxy_http
+sudo systemctl restart apache2
+→ apache proxy support enabled
+
+sudo nano /etc/apache2/sites-available/node.index.com.conf → conf file for node
+
+<VirtualHost *:80>
+    ServerName node.index.com
+    ProxyPreserveHost On
+    ProxyRequests Off
+    ProxyPass / http://127.0.0.1:3000/
+    ProxyPassReverse / http://127.0.0.1:3000/
+</VirtualHost>
+
+sudo a2ensite node.index.com.conf
+sudo systemctl reload apache2
+apachectl -S → verify
+
+sudo nano /etc/hosts
+192.168.100.126   node.index.com
+
+
+
+5. (15) Инсталирајте FTP со корисник editor кој ќе има привилегии за читање и запишување на
+поддиректориумот ftp во фолдерот /home/student. Фолдерот ftp треба да се креира доколку не
+постои. 
+
+sudo apt update
+sudo apt install vsftpd -y
+sudo systemctl status vsftpd
+
+sudo adduser editor
+sudo mkdir -p /home/student/ftp → this directory will be ftp root directory for the user
+sudo chown editor:editor /home/student/ftp → ownership is assigned to the user editor
+
+!vsftpd does not allow a writable directory as the chroot root for security reasons.
+The FTP root directory must NOT be writable
+A writable subdirectory must be created inside it!
+
+sudo chmod a-w /home/student/ftp → remove write permission from ftp root
+
+sudo mkdir /home/student/ftp/files                       
+sudo chown editor:editor /home/student/ftp/files   
+sudo chmod 755 /home/student/ftp/files                
+→ the files directory where uploads and downloads happens.
+
+sudo nano /etc/vsftpd.conf → ensure these are present:
+anonymous_enable=NO
+local_enable=YES
+write_enable=YES
+chroot_local_user=YES
+user_sub_token=$USER
+local_root=/home/student/ftp
+
+sudo systemctl restart vsftpd
+
+test it with a file: echo "TEST" > test.txt
+
+go into ftp:
+ftp 192.168.100.126
+put in "editor" as username and your password
+
+cd files → go into the files directory
+pwd → shows in which directory you are
+ls → list files
+put test.txt → copy test.txt into the folder
+ls
+get test.txt 
+bye
+
+6. (15) Конфигурирајте го локалниот firewall да ги пропушта само барањата до поставените сервиси, со соодветни протоколи и порти. На ispiti во одговор на задачата напишете и како овие правила би се имплементирале преку iptables.
+
+Okay so for now we have these ports:
+SSH TCP 22
+Apache (HTTP) TCP 80
+FTP (control) TCP 21
+FTP (passive mode) TCP 40000–50000
+
+so we do these commands:
+
+sudo ufw enable
+sudo ufw status verbose
+
+sudo ufw allow 22/tcp → SSH
+sudo ufw allow 80/tcp → HTTP(apache)
+sudo ufw allow 21/tcp → FTP
+sudo ufw allow 40000:50000 → FTP(passive)
+
+sudo ufw default deny incoming → default policy
+sudo ufw default allow outgoing → default policy
+
+sudo ufw status numbered:
+
+[ 1] 22/tcp                     ALLOW IN    Anywhere                  
+[ 2] 80/tcp                     ALLOW IN    Anywhere                  
+[ 3] 21/tcp                     ALLOW IN    Anywhere                  
+[ 4] 40000:50000/tcp       ALLOW IN    Anywhere        
+
+
+PART 2 - IP Tables:
+
+iptables -P INPUT DROP → → → → v
+iptables -P FORWARD DROP → drop all incoming traffic default
+iptables -P OUTPUT ACCEPT → allow outgoing traffic
+
+iptables -A INPUT -i lo -j ACCEPT → loopback traffic
+
+iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT → allows responses to outgoing connections
+
+SSH:
+iptables -A INPUT -p tcp --dport 22 -j ACCEPT
+HTTP:
+iptables -A INPUT -p tcp --dport 80 -j ACCEPT
+FTP:
+iptables -A INPUT -p tcp --dport 21 -j ACCEPT
+FTP(Passive):
+iptables -A INPUT -p tcp --dport 40000:50000 -j ACCEPT
+
+
+
+          
+
+
+
+
+
+
+
+
+
+
