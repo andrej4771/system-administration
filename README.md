@@ -1,8 +1,5 @@
-# System Administration
 
-Hello, this is a learning repostirory for System Administration, step by step, explained! Enjoy!
-
-# Network Services Lab – ANS
+# Network Services Lab – System Administration
 
 This repository contains **step-by-step documentation** and **verified commands** for configuring core network services on **Ubuntu Linux** as part of the ANS lab exercises.
 
