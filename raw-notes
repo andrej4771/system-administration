@@ -467,3 +467,58 @@ FTP:
 iptables -A INPUT -p tcp --dport 21 -j ACCEPT
 FTP(Passive):
 iptables -A INPUT -p tcp --dport 40000:50000 -j ACCEPT
+
+
+# Install nginx + PHP-FPM + extensions
+sudo apt update
+sudo apt install nginx php php-fpm php-mysql php-xml php-curl php-gd php-intl php-mbstring php-zip
+
+# /etc/nginx/sites-available/moodle
+server {
+    listen 8088;
+    server_name 192.168.100.126;
+
+    root /opt/moodle;
+    index index.php index.html;
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/run/php/php8.1-fpm.sock;
+    }
+
+    location ~ /\.ht {
+        deny all;
+    }
+}
+
+# Enable site
+sudo ln -s /etc/nginx/sites-available/moodle /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl reload nginx
+
+<?php
+// /opt/moodle/config.php
+unset($CFG);
+global $CFG;
+$CFG = new stdClass();
+
+$CFG->dbtype    = 'mysqli';
+$CFG->dbhost    = 'localhost';
+$CFG->dbname    = 'moodle';
+$CFG->dbuser    = 'moodleuser';
+$CFG->dbpass    = 'StrongPass123';
+$CFG->prefix    = 'mdl_';
+
+$CFG->wwwroot   = 'http://192.168.100.126:8088';
+$CFG->dataroot  = '/var/moodledata';
+$CFG->admin     = 'admin';
+
+require_once(__DIR__ . '/lib/setup.php');
+
+# Permissions
+sudo chown www-data:www-data /opt/moodle/config.php
+sudo chmod 640 /opt/moodle/config.php
